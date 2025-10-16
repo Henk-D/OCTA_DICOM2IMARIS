@@ -1,0 +1,7 @@
+# DICOM处理所需的Python包
+
+pydicom>=2.3.0          # DICOM文件读取
+numpy>=1.21.0           # 数组处理
+matplotlib>=3.5.0       # 可视化
+tifffile>=2021.11.2     # TIFF导出（Imaris兼容）
+Pillow>=9.0.0           # 图像处理
