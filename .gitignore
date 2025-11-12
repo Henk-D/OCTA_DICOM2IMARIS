@@ -59,9 +59,17 @@ desktop.ini
 *.jpg
 *.jpeg
 !DIAGNOSTIC_*.png
+
+# Exclude data and results content, keep folder structure
 DataFiles/*/
 !DataFiles/README.md
+!DataFiles/.gitkeep
 !DataFiles/EXAMPLE_PATIENT/
+
+Results/*/
+!Results/.gitkeep
+
+# Specific output files
 OCTA_*.tif
 OCTA_*.npy
 OCTA_*.ims

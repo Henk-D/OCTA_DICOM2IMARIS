@@ -1,328 +1,157 @@
-﻿# 📖 OCTA数据处理指南
+# Zeiss Cirrus OCTA DICOM转换工具
 
-## ⚡ 快速开始 - 当前数据已处理完成
+## 功能
+将Zeiss Cirrus HD-OCT导出的OCTA DICOM文件转换为Imaris可用的TIFF格式。
 
-### 在Imaris中打开当前数据
+## 特点
+- ✅ 自动修复损坏的DICOM元数据
+- ✅ 处理JPEG 2000压缩
+- ✅ 自动检测并修复维度错误
+- ✅ 智能选择最佳血管造影图文件
+- ✅ 适应不同分辨率（245×245×1024和490×490×1024）
+- ✅ 生成预览图和元数据
 
-**文件：** `OCTA_SingleFile.tif` (58.78 MB)
-
-**体素尺寸：**
+## 文件结构
 ```
-X: 12.245 微米
-Y: 12.245 微米  
-Z: 1.953 微米
-```
-
-**验证：** 打开 `OCTA_SingleFile_Preview.png` 查看左上角应该有血管网络
-
----
-
-## 🆕 处理新患者数据
-
-### 方法1：修改现有脚本（适合偶尔处理）
-
-1. **准备数据**
-   ```
-   将新患者的DICOM文件放入：
-   DataFiles/E999/  (E999改成你的患者ID)
-   ```
-
-2. **修改脚本**
-   - 打开 `OCTA_DICOM2IMARIS_SingleFile.py`
-   - 找到第26行左右：
-   ```python
-   data_folder = Path(__file__).parent / "DataFiles" / "E361"
-   ```
-   - 改为：
-   ```python
-   data_folder = Path(__file__).parent / "DataFiles" / "E999"  # 你的患者ID
-   ```
-
-3. **运行**
-   ```
-   双击: run_single_file.bat
-   ```
-
----
-
-### 方法2：使用通用脚本（推荐，适合批量处理）
-
-1. **创建通用脚本**
-   - 将下方的 `OCTA_DICOM2IMARIS.py` 代码保存为新文件
-
-2. **运行方式**
-   ```bash
-   # 处理指定患者
-   python OCTA_DICOM2IMARIS.py E999
-   
-   # 自动处理DataFiles/下第一个患者
-   python OCTA_DICOM2IMARIS.py
-   ```
-
-3. **批量处理**
-   ```bash
-   python OCTA_DICOM2IMARIS.py E361
-   python OCTA_DICOM2IMARIS.py E999
-   python OCTA_DICOM2IMARIS.py E1000
-   ```
-
----
-
-## 📋 输出文件说明
-
-处理完成后会生成4个文件：
-
-| 文件 | 用途 | 大小 |
-|------|------|------|
-| `OCTA_[PatientID].tif` | Imaris打开这个 | ~60 MB |
-| `OCTA_[PatientID]_Preview.png` | 验证有血管 | 几MB |
-| `OCTA_[PatientID].npy` | Python处理 | ~60 MB |
-| `OCTA_[PatientID]_metadata.json` | 参数信息 | 几KB |
-
----
-
-## 🔧 通用处理脚本代码
-
-保存以下代码为 `OCTA_DICOM2IMARIS.py`:
-
-```python
-# -*- coding: utf-8 -*-
-"""
-Universal OCTA DICOM Processor for any patient
-Usage: python OCTA_DICOM2IMARIS.py [patient_id]
-"""
-import sys, pydicom, numpy as np, json
-from pathlib import Path
-import warnings
-warnings.filterwarnings('ignore')
-
-def process_octa(patient_id=None):
-    print("\n" + "="*80)
-    print("Universal OCTA Processor")
-    print("="*80 + "\n")
-    
-    base_folder = Path(__file__).parent / "DataFiles"
-    
-    if patient_id:
-        data_folder = base_folder / patient_id
-    else:
-        subfolders = [f for f in base_folder.iterdir() if f.is_dir()]
-        if not subfolders:
-            print("ERROR: No folders in DataFiles/")
-            return False
-        data_folder = subfolders[0]
-        patient_id = data_folder.name
-    
-    if not data_folder.exists():
-        print(f"ERROR: {data_folder} not found")
-        return False
-    
-    print(f"Patient: {patient_id}")
-    print(f"Folder: {data_folder}\n")
-    
-    dcm_files = sorted([f for f in data_folder.glob("*.DCM") if f.name != "DICOMDIR"])
-    if not dcm_files:
-        print("ERROR: No DCM files!")
-        return False
-    
-    print(f"Found {len(dcm_files)} files\n")
-    
-    # Read files
-    all_data = []
-    for i, fp in enumerate(dcm_files, 1):
-        try:
-            dcm = pydicom.dcmread(str(fp), force=True)
-            if not hasattr(dcm, 'PixelData'):
-                continue
-            if hasattr(dcm, 'PhotometricInterpretation'):
-                if 'MONOCHROME2' in str(dcm.PhotometricInterpretation):
-                    dcm.PhotometricInterpretation = 'MONOCHROME2'
-            img = dcm.pixel_array
-            print(f"  [{i}] {img.shape}, mean={img.mean():.1f}")
-            all_data.append((img, dcm))
-        except Exception as e:
-            print(f"  [{i}] ERROR")
-    
-    if not all_data:
-        print("\nNo valid data!")
-        return False
-    
-    # Find 3D shape
-    target = None
-    for img, _ in all_data:
-        if len(img.shape) == 3 and img.shape[0] > 100 and img.shape[2] > 500:
-            target = img.shape
-            break
-    
-    if not target:
-        print("No 3D data found!")
-        return False
-    
-    candidates = [(img, dcm) for img, dcm in all_data if img.shape == target]
-    print(f"\n{len(candidates)} files with shape {target}\n")
-    
-    # Select best (most vessel signal)
-    best_score, best_data = 0, None
-    for img, dcm in candidates:
-        img_u8 = (img.astype(np.int16) + 128).astype(np.uint8) if img.dtype == np.int8 else ((img - img.min()) / (img.max() - img.min()) * 255).astype(np.uint8)
-        score = np.sum(np.max(img_u8, axis=2) > 180)
-        if score > best_score:
-            best_score, best_data = score, (img, dcm, img_u8)
-    
-    if not best_data:
-        print("No suitable data!")
-        return False
-    
-    _, sel_dcm, vol = best_data
-    print(f"Selected file: vessel_score={best_score}")
-    print(f"Volume: {vol.shape} (Y,X,Z)\n")
-    
-    # Voxel size
-    vx = vy = (3.0 / vol.shape[0]) * 1000
-    vz = (2.0 / vol.shape[2]) * 1000
-    print(f"Voxel: X={vx:.3f}, Y={vy:.3f}, Z={vz:.3f} um\n")
-    
-    # Save
-    out = Path(__file__).parent
-    name = f"OCTA_{patient_id}"
-    
-    print("="*80)
-    print("Saving...")
-    print("="*80 + "\n")
-    
-    # NPY
-    npy_p = out / f"{name}.npy"
-    np.save(npy_p, vol)
-    print(f"[1] {npy_p.name} ({npy_p.stat().st_size/1024/1024:.1f}MB)")
-    
-    # JSON
-    meta = {'patient': patient_id, 'shape': list(vol.shape), 
-            'voxel_um': {'X': vx, 'Y': vy, 'Z': vz}}
-    with open(out / f"{name}_metadata.json", 'w') as f:
-        json.dump(meta, f, indent=2)
-    print(f"[2] {name}_metadata.json")
-    
-    # TIFF
-    try:
-        import tifffile
-        vol_zyx = np.transpose(vol, (2,0,1))
-        tif_p = out / f"{name}.tif"
-        tifffile.imwrite(tif_p, vol_zyx, imagej=True,
-                        resolution=(1000/vy, 1000/vx),
-                        metadata={'spacing': vz/1000, 'unit': 'mm', 'axes': 'ZYX'})
-        print(f"[3] {tif_p.name} ({tif_p.stat().st_size/1024/1024:.1f}MB)")
-    except: print("[3] TIFF error")
-    
-    # Preview
-    try:
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
-        
-        fig, ax = plt.subplots(2,2, figsize=(12,12))
-        ax[0,0].imshow(np.max(vol, axis=2), cmap='hot')
-        ax[0,0].set_title(f'{patient_id} - En Face (check vessels!)', weight='bold')
-        ax[0,0].axis('off')
-        
-        ax[0,1].imshow(np.max(vol, axis=0), cmap='hot', aspect='auto')
-        ax[0,1].set_title('Side Y'); ax[0,1].axis('off')
-        
-        ax[1,0].imshow(np.max(vol, axis=1), cmap='hot', aspect='auto')
-        ax[1,0].set_title('Side X'); ax[1,0].axis('off')
-        
-        ax[1,1].imshow(vol[:,:,vol.shape[2]//2], cmap='gray')
-        ax[1,1].set_title('Central slice'); ax[1,1].axis('off')
-        
-        plt.tight_layout()
-        prev_p = out / f"{name}_Preview.png"
-        plt.savefig(prev_p, dpi=150)
-        plt.close()
-        print(f"[4] {prev_p.name}")
-    except: print("[4] Preview error")
-    
-    print(f"\n" + "="*80)
-    print("SUCCESS!")
-    print("="*80)
-    print(f"\nImaris: {name}.tif")
-    print(f"Voxel: X={vx:.3f}, Y={vy:.3f}, Z={vz:.3f} um")
-    print("="*80 + "\n")
-    return True
-
-if __name__ == "__main__":
-    pid = sys.argv[1] if len(sys.argv) > 1 else None
-    try:
-        if not process_octa(pid):
-            print("Failed!")
-        input("Press Enter...")
-    except Exception as e:
-        print(f"\nERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        input()
+OCTA_DICOM2IMARIS/
+├── DataFiles/          # 放置DICOM源文件
+│   ├── E361/
+│   ├── HenkE433/
+│   └── ...
+├── Results/            # 输出结果
+│   ├── E361/
+│   │   ├── E361.tif           # Imaris使用
+│   │   ├── E361.npy           # NumPy格式
+│   │   ├── E361_metadata.json # 元数据
+│   │   └── E361_Preview.png   # 预览图
+│   └── ...
+└── Zeiss_OCTA_Converter.py  # 转换脚本
 ```
 
----
+## 使用方法
 
-## 📊 文件结构
+### 1. 准备数据
+将Zeiss导出的DICOM文件放入 `DataFiles/<文件夹名>/` 目录
 
-```
-工作文件夹/
-├── OCTA_DICOM2IMARIS_SingleFile.py    ← 当前E361专用
-├── OCTA_DICOM2IMARIS.py    ← 通用脚本（需创建）
-├── run_single_file.bat             ← 一键运行
-│
-├── DataFiles/
-│   ├── E361/                       ← 当前患者DICOM
-│   └── E999/                       ← 新患者放这里
-│
-├── OCTA_SingleFile.tif             ← 当前患者输出
-├── OCTA_SingleFile_Preview.png
-├── OCTA_SingleFile.npy
-└── OCTA_SingleFile_metadata.json
+### 2. 运行转换
+```powershell
+cd OCTA_DICOM2IMARIS
+python Zeiss_OCTA_Converter.py <文件夹名>
 ```
 
----
-
-## 🆘 常见问题
-
-### Q: Preview图没有血管？
-**A:** 脚本会自动选择血管信号最强的文件。如果所有文件都没有血管，检查原始DICOM数据。
-
-### Q: Imaris中还是左右分离？
-**A:** 使用 `OCTA_DICOM2IMARIS_SingleFile.py` 或 `OCTA_DICOM2IMARIS.py`，不要合并多个文件。
-
-### Q: 体素尺寸不确定？
-**A:** 默认使用 3mm×3mm扫描区域，2mm深度。如需修改，编辑脚本中的 `scan_width_mm` 和 `scan_depth_mm`。
-
-### Q: 如何批量处理？
-**A:** 使用通用脚本循环处理：
-```bash
-python OCTA_DICOM2IMARIS.py E361
-python OCTA_DICOM2IMARIS.py E999
-python OCTA_DICOM2IMARIS.py E1000
+例如：
+```powershell
+python Zeiss_OCTA_Converter.py HenkE433
 ```
 
+### 3. 批量处理
+```powershell
+foreach ($dataset in @('HenkE433', 'HenkE434', 'HenkE435', 'HenkE436')) {
+    python Zeiss_OCTA_Converter.py $dataset
+}
+```
+
+## 输出文件说明
+
+### 1. TIFF文件 (.tif)
+- 用于Imaris导入
+- 格式：ZYX（深度×高度×宽度）
+- 包含正确的体素尺寸元数据
+
+### 2. NumPy文件 (.npy)
+- Python NumPy格式
+- 可用于进一步分析
+
+### 3. 元数据文件 (_metadata.json)
+- 包含：
+  - 源文件信息
+  - 图像尺寸
+  - 体素大小
+  - 血管分析结果
+  - 患者信息
+
+### 4. 预览图 (_Preview.png)
+- 4个视图：
+  - En Face (MIP沿Z轴)
+  - 侧视图 (MIP沿Y轴)
+  - 侧视图 (MIP沿X轴)
+  - 中央切片
+
+## Imaris导入设置
+
+1. 打开Imaris
+2. File → Open → 选择 `.tif` 文件
+3. 体素大小已自动设置：
+   - 245×245: X=12.245 µm, Y=12.245 µm, Z=1.953 µm
+   - 490×490: X=12.245 µm, Y=12.245 µm, Z=1.953 µm
+
+## 已知问题和解决方案
+
+### 问题1：看不到血管信号
+**原因**：DICOM文件可能包含多种类型的数据（结构图、血管造影图等）
+
+**解决**：脚本会自动选择最可能是血管造影图的文件（基于vessel score）
+
+### 问题2：3个结构堆叠
+**原因**：维度混淆或选择了错误的文件类型
+
+**解决**：脚本已自动检测并修正维度问题
+
+### 问题3：部分文件无法读取
+**状态**：正常现象
+
+**说明**：每个数据集通常包含8个文件，其中：
+- 2-3个可以成功解压和读取
+- 其余文件可能损坏或格式不同
+- 脚本会自动选择最佳的可读文件
+
+## 依赖包
+- pydicom
+- pylibjpeg
+- pylibjpeg-openjpeg
+- numpy
+- tifffile
+- matplotlib
+
+## 安装依赖
+```powershell
+pip install pydicom pylibjpeg pylibjpeg-openjpeg numpy tifffile matplotlib
+```
+
+## 测试结果
+
+### 已成功测试的数据集
+- ✅ E361 (245×245×1024)
+- ✅ HenkE433 (245×245×1024)
+- ✅ HenkE434 (245×245×1024)
+- ✅ HenkE435 (245×245×1024)
+- ✅ HenkE436 (490×490×1024)
+
+### 典型读取情况
+每个数据集 (8个DICOM文件):
+- 通常可读取：2-3个文件
+- 其中选择最佳：1个文件
+- 这是正常的，因为不是所有文件都是血管造影图
+
+## 故障排除
+
+### 错误："找不到数据文件夹"
+确保DICOM文件在 `DataFiles/<文件夹名>/` 目录下
+
+### 错误："无法读取任何有效文件"
+检查：
+1. DICOM文件是否损坏
+2. 是否安装了所有依赖包
+3. 是否为Zeiss Cirrus格式
+
+### 输出全黑或全白
+可能选择了错误的文件类型。查看metadata.json中的vessel_analysis部分，确认选择的文件特征。
+
+## 联系与支持
+如有问题，请检查：
+1. Results文件夹中的Preview.png
+2. metadata.json中的vessel_analysis
+3. 控制台输出的文件分析信息
+
 ---
-
-## 📚 详细文档
-
-- `血管可视化指南.md` - Imaris详细使用说明
-- `左右分离问题解决方案.md` - 技术分析
-- `问题解决总结.md` - 问题诊断历史
-
----
-
-## ✅ 处理新数据检查清单
-
-- [ ] DICOM文件放入 `DataFiles/[PatientID]/`
-- [ ] 修改脚本患者ID 或 使用通用脚本
-- [ ] 运行脚本
-- [ ] 检查生成4个文件（.tif, .png, .npy, .json）
-- [ ] 打开Preview确认有血管
-- [ ] 在Imaris中测试打开
-- [ ] 设置体素尺寸（见metadata.json）
-
----
-
-**更新日期：** 2025年10月16日  
-**适用数据：** Carl Zeiss CIRRUS OCTA DICOM
+最后更新：2025年11月6日
