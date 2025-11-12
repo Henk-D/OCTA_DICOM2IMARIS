@@ -140,20 +140,35 @@ def calculate_voxel_size(image_shape):
     Assumptions for Zeiss Cirrus OCTA:
     - Depth (Z) is always 2.0 mm (typically 1024 pixels)
     - Width (X/Y) varies by scan protocol:
-        - 3x3 mm for 245x245 scans
-        - 6x6 mm for 490x490 scans
+        - 3x3 mm for ~245x245 scans
+        - 4x4 mm for ~320x320 scans
+        - 5x5 mm for ~400x400 scans
+        - 6x6 mm for ~490x490 scans
+        - 8x8 mm for ~640x640 scans
+        - 9x9 mm for ~700x700 scans
+        - 12x12 mm for ~980x980 scans
     """
     rows, cols, depth_pixels = image_shape
     
     # Estimate scan width based on lateral resolution
+    # Using approximate 12.2 µm/pixel resolution as baseline
     if rows <= 250:
-        scan_width_mm = 3.0
+        scan_width_mm = 3.0      # 245 pixels
     elif rows <= 350:
-        scan_width_mm = 4.0
+        scan_width_mm = 4.0      # ~320 pixels
     elif rows <= 450:
-        scan_width_mm = 5.0
+        scan_width_mm = 5.0      # ~400 pixels
+    elif rows <= 550:
+        scan_width_mm = 6.0      # ~490 pixels
+    elif rows <= 700:
+        scan_width_mm = 8.0      # ~640 pixels
+    elif rows <= 850:
+        scan_width_mm = 9.0      # ~730 pixels
+    elif rows <= 1000:
+        scan_width_mm = 12.0     # ~980 pixels
     else:
-        scan_width_mm = 6.0
+        # For very large scans, estimate based on ~12 µm resolution
+        scan_width_mm = round((rows * 0.012) / 0.5) * 0.5  # Round to nearest 0.5mm
     
     scan_depth_mm = 2.0
     
