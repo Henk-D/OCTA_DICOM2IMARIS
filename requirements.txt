@@ -4,5 +4,6 @@ pydicom>=2.3.0          # DICOM文件读取
 numpy>=1.21.0           # 数组处理
 matplotlib>=3.5.0       # 可视化
 tifffile>=2021.11.2     # TIFF导出（Imaris兼容）
+nibabel>=3.2.0          # NIfTI格式导出（医学影像软件兼容）
 pylibjpeg>=1.4.0        # JPEG解压缩支持
 pylibjpeg-openjpeg>=1.2.0  # JPEG 2000解压缩（Zeiss DICOM必需）

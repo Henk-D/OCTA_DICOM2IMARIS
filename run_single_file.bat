@@ -9,23 +9,28 @@ echo This version processes ONLY the file with visible vessels
 echo Avoids the left-right separation issue in Imaris
 echo.
 
-python OCTA_DICOM2IMARIS_SingleFile.py
+echo NOTE: This script is deprecated. Use Zeiss_OCTA_Converter.py instead.
+echo The new version automatically selects the best volume.
+echo.
+set /p folder_name="Enter data folder name: "
+if "%folder_name%"=="" (
+    echo ERROR: No folder name provided!
+    pause
+    exit /b 1
+)
+
+python Zeiss_OCTA_Converter.py %folder_name%
 
 echo.
 echo ========================================
 echo Done!
 echo ========================================
 echo.
-echo Generated files:
-echo   - OCTA_SingleFile.tif (58 MB) - Use this in Imaris!
-echo   - OCTA_SingleFile_Preview.png - Check vessels here
+echo Output files are in Results\%folder_name%\
+echo   - OCTA_%folder_name%.tif - Use in Imaris
+echo   - OCTA_%folder_name%.nii.gz - Use in ITK-SNAP/3D Slicer
+echo   - OCTA_%folder_name%_Preview.png - Check vessels here
 echo.
-echo Voxel size for Imaris:
-echo   X: 12.245 um
-echo   Y: 12.245 um
-echo   Z: 1.953 um
-echo.
-echo This should show clean, continuous vessels!
-echo No left-right separation!
+echo Voxel sizes are embedded in the files!
 echo.
 pause

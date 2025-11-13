@@ -1,35 +1,37 @@
 @echo off
-REM Zeiss OCTA DICOM转TIFF转换器 - 快速启动脚本
-REM 使用方法：将此文件拖到桌面，双击运行
+chcp 65001 >nul
+REM Zeiss OCTA DICOM Converter - Quick Launch Script
+REM Usage: Double-click to run
 
 echo ================================================================================
-echo Zeiss Cirrus OCTA DICOM 转 TIFF 转换器
+echo Zeiss Cirrus OCTA DICOM to TIFF/NIfTI Converter
 echo ================================================================================
 echo.
 
-REM 获取用户输入
-set /p folder_name="请输入数据文件夹名称 (例如: HenkE433): "
+REM Get user input
+set /p folder_name="Enter data folder name (e.g., HenkE433): "
 
 if "%folder_name%"=="" (
-    echo 错误：未输入文件夹名称！
+    echo ERROR: No folder name provided!
     pause
     exit /b 1
 )
 
 echo.
-echo 开始转换 %folder_name% ...
+echo Converting %folder_name% ...
 echo.
 
-REM 运行Python脚本
+REM Run Python script
 python "%~dp0Zeiss_OCTA_Converter.py" %folder_name%
 
 echo.
-echo 转换完成！
+echo Conversion complete!
 echo.
-echo 输出文件：
-echo   - OCTA_%folder_name%.tif (用于Imaris)
-echo   - OCTA_%folder_name%.npy (NumPy数组)
-echo   - OCTA_%folder_name%_metadata.json (元数据)
-echo   - OCTA_%folder_name%_Preview.png (预览图)
+echo Output files in Results\%folder_name%\:
+echo   - OCTA_%folder_name%.tif (for Imaris)
+echo   - OCTA_%folder_name%.nii.gz (for medical imaging software)
+echo   - OCTA_%folder_name%.npy (NumPy array)
+echo   - OCTA_%folder_name%_metadata.json (metadata)
+echo   - OCTA_%folder_name%_Preview.png (preview)
 echo.
 pause

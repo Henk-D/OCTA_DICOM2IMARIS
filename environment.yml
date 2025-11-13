@@ -1,0 +1,22 @@
+# Zeiss OCTA Converter - Conda/Mamba Environment
+# Create environment: mamba env create -f environment.yml
+# Activate environment: mamba activate octa-converter
+# Update environment: mamba env update -f environment.yml
+
+name: octa-converter
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python>=3.8
+  - pydicom>=2.3.0
+  - numpy>=1.21.0
+  - matplotlib>=3.5.0
+  - tifffile>=2021.11.2
+  - nibabel>=3.2.0
+  - pip
+  - pip:
+    - pylibjpeg>=1.4.0
+    - pylibjpeg-openjpeg>=1.2.0

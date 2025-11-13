@@ -68,15 +68,81 @@ First stable release of OCTA_DICOM2IMARIS - a tool to convert Carl Zeiss CIRRUS 
 
 ---
 
+## [2.0.0] - 2025-11-12
+
+### 🎉 Major Update - GUI, NIfTI Export, and Environment Management
+
+### Added
+- **GUI Interface** (`OCTA_Converter_GUI.py`)
+  - Complete graphical user interface with tkinter
+  - Visual folder selection with dropdown menu
+  - Real-time conversion log display
+  - Progress bar animation
+  - Auto-open output folder on completion
+  - Launch script: `启动GUI.bat`
+
+- **NIfTI Format Export**
+  - Medical imaging standard format (`.nii.gz`)
+  - Compatible with ITK-SNAP, 3D Slicer, FSL, SPM
+  - Embedded voxel sizes in NIfTI header
+  - Compressed format (~38MB per volume)
+  - Added `nibabel>=3.2.0` dependency
+
+- **Conda/Mamba Environment Support**
+  - `environment.yml` configuration file
+  - `setup_environment.bat` automated setup script
+  - Environment name: `octa-converter`
+  - Supports both mamba and conda package managers
+
+- **Extended Resolution Support**
+  - 8x8mm scans (640x640 pixels)
+  - 9x9mm scans (730x730 pixels)
+  - 12x12mm scans (980x980 pixels)
+  - Automatic estimation for custom resolutions
+
+- **New Documentation**
+  - `快速开始.md` - Quick start guide
+  - Updated all docs with NIfTI format information
+  - Multi-resolution support tables
+
+### Changed
+- **Fixed Batch Script Encoding**
+  - Added `chcp 65001` to all `.bat` files
+  - Switched to English interface to avoid encoding issues
+  - `转换OCTA数据.bat` updated with NIfTI information
+  
+- **Updated Legacy Scripts**
+  - `run_universal.bat` now calls `Zeiss_OCTA_Converter.py`
+  - `run_single_file.bat` now calls `Zeiss_OCTA_Converter.py`
+  - Added interactive folder name input
+
+- **Enhanced Output**
+  - Now generates **5 files** per conversion:
+    1. `.tif` - Imaris (59MB)
+    2. `.nii.gz` - Medical imaging software (38MB)
+    3. `.npy` - NumPy array (59MB)
+    4. `.json` - Metadata (1KB)
+    5. `.png` - MIP preview (2MB)
+
+### Technical Details
+- NIfTI uses RAS+ coordinate system
+- Voxel sizes in mm (embedded in header)
+- GUI runs conversion in separate thread (non-blocking)
+- Environment setup script auto-detects mamba/conda
+
+### Fixed
+- Chinese character display issues in Windows batch files
+- Batch script compatibility with new main script name
+
+---
+
 ## [Unreleased]
 
 ### Planned Features
-- [ ] GUI interface for easier operation
-- [ ] Batch processing with progress bar
+- [ ] Batch processing multiple folders
 - [ ] Support for other OCTA device manufacturers
 - [ ] Automatic Imaris project file (.ims) generation
 - [ ] Advanced vessel enhancement filters
-- [ ] Multi-language support (English UI)
 - [ ] Docker container for cross-platform compatibility
 - [ ] Integration with cloud storage (Google Drive, OneDrive)
 
@@ -84,7 +150,6 @@ First stable release of OCTA_DICOM2IMARIS - a tool to convert Carl Zeiss CIRRUS 
 - [ ] DICOM tag editor
 - [ ] Vessel segmentation tools
 - [ ] Statistical analysis of vessel density
-- [ ] Export to other formats (HDF5, NIfTI)
 - [ ] Web-based viewer
 
 ---

@@ -421,13 +421,54 @@ def main():
     except Exception as e:
         print(f"[3] TIFF: ERROR - {e}")
     
-    # 4. Preview
+    # 4. NIfTI for medical imaging software
+    try:
+        import nibabel as nib
+        
+        nifti_path = output_folder / f"{base_name}.nii.gz"
+        
+        # NIfTI uses RAS+ coordinate system, we use (X, Y, Z) orientation
+        # Volume is already in (Y, X, Z), transpose to (X, Y, Z) for standard neuroimaging
+        volume_xyz = np.transpose(volume_uint8, (1, 0, 2))
+        
+        # Create affine matrix with voxel sizes (in mm)
+        # NIfTI expects voxel sizes in mm
+        affine = np.array([
+            [voxel_x / 1000, 0, 0, 0],
+            [0, voxel_y / 1000, 0, 0],
+            [0, 0, voxel_z / 1000, 0],
+            [0, 0, 0, 1]
+        ])
+        
+        # Create NIfTI image
+        nifti_img = nib.Nifti1Image(volume_xyz, affine)
+        
+        # Add metadata to header
+        nifti_img.header['descrip'] = f'Zeiss OCTA {folder_name}'.encode('utf-8')
+        nifti_img.header['xyzt_units'] = 2  # mm for spatial units
+        
+        # Save compressed NIfTI
+        nib.save(nifti_img, str(nifti_path))
+        
+        file_size = nifti_path.stat().st_size / 1024 / 1024
+        print(f"[4] NIfTI: {nifti_path.name} ({file_size:.2f} MB)")
+        print(f"    Shape: {volume_xyz.shape} (X, Y, Z)")
+        print(f"    Voxel size: {voxel_x/1000:.4f} x {voxel_y/1000:.4f} x {voxel_z/1000:.4f} mm")
+        print(f"    ✓ Ready for medical imaging software!")
+        
+    except ImportError:
+        print(f"[4] NIfTI: Skipped (nibabel not installed)")
+        print(f"    Install with: pip install nibabel")
+    except Exception as e:
+        print(f"[4] NIfTI: ERROR - {e}")
+    
+    # 5. Preview
     try:
         import matplotlib
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         
-        print(f"\n[4] Generating preview...")
+        print(f"\n[5] Generating preview...")
         
         # Maximum intensity projections
         mip_z = np.max(volume_uint8, axis=2)
@@ -461,7 +502,7 @@ def main():
         print(f"    Preview: {preview_path.name}")
         
     except Exception as e:
-        print(f"[4] Preview: ERROR - {e}")
+        print(f"[5] Preview: ERROR - {e}")
     
     # Summary
     print(f"\n{'='*80}")
@@ -469,13 +510,17 @@ def main():
     print('='*80)
     print(f"\nOutput files:")
     print(f"  - {base_name}.tif (for Imaris)")
-    print(f"  - {base_name}.npy (NumPy array)")
+    print(f"  - {base_name}.nii.gz (for medical imaging software: ITK-SNAP, 3D Slicer, etc.)")
+    print(f"  - {base_name}.npy (NumPy array for Python)")
     print(f"  - {base_name}_metadata.json (scan parameters)")
     print(f"  - {base_name}_Preview.png (visualization)")
     print(f"\nFor Imaris:")
     print(f"  1. Open {base_name}.tif")
-    print(f"  2. Set voxel size: X={voxel_x:.3f}, Y={voxel_y:.3f}, Z={voxel_z:.3f} µm")
+    print(f"  2. Voxel size is embedded: X={voxel_x:.3f}, Y={voxel_y:.3f}, Z={voxel_z:.3f} µm")
     print(f"  3. Adjust contrast/brightness if needed")
+    print(f"\nFor other software (ITK-SNAP, 3D Slicer, etc.):")
+    print(f"  1. Open {base_name}.nii.gz")
+    print(f"  2. Voxel size is embedded in NIfTI header")
     print('='*80 + "\n")
     
     return True
